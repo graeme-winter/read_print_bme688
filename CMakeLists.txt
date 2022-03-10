@@ -9,7 +9,7 @@ project(read_print_bme688 C CXX ASM)
 
 pico_sdk_init()
 
-add_executable(read_print_bme688 read_print_bme688.c)
+add_executable(read_print_bme688 read_print_bme688.c api/bme68x.c)
 
 pico_set_program_name(read_print_bme688 "read_print_bme688")
 pico_set_program_version(read_print_bme688 "0.1")
