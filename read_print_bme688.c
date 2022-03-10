@@ -53,11 +53,7 @@ int main() {
 
     int result;
     uint8_t received;
-    if (address_reserved(addr)) {
-      result = PICO_ERROR_GENERIC;
-    } else {
-      result = i2c_read_blocking(I2C1_PORT, addr, &received, 1, false);
-    }
+    result = i2c_read_blocking(I2C1_PORT, addr, &received, 1, false);
     if (result < 0) {
       printf("Not found\n");
     } else {
