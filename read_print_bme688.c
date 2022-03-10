@@ -27,7 +27,7 @@ const uint LED = 25;
 
 // helper functions - map from bme68x API to pico SDK i2c
 
-BME68X_INTF_RET_TYPE bme68x_i2c_write(uint8_t reg_addr, uint8_t *reg_data,
+BME68X_INTF_RET_TYPE bme68x_i2c_write(uint8_t reg_addr, const uint8_t *reg_data,
                                       uint32_t len, void *ignore) {
   // copy message to prepend register - or could I just make
   // 2 calls to write with the first keeping the channel open?
