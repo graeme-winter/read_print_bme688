@@ -25,8 +25,34 @@
 
 const uint LED = 25;
 
+// helper functions - map from bme68x API to pico SDK i2c
+
+BME68X_INTF_RET_TYPE bme68x_i2c_write(uint8_t reg_addr, uint8_t *reg_data,
+                                      uint32_t len, void *ignore) {
+  // copy message to prepend register - or could I just make
+  // 2 calls to write with the first keeping the channel open?
+  uint8_t buffer[len + 1];
+  buffer[0] = reg_addr;
+  for (uint32_t j = 0; j < len; j++) {
+    buffer[j + 1] = reg_data[j];
+  }
+
+  return i2c_write_blocking(I2C1_PORT, BME688_ADDR, buffer, len + 1, false);
+}
+
+BME68X_INTF_RET_TYPE bme68x_i2c_read(uint8_t reg_addr, uint8_t *reg_data,
+                                     uint32_t len, void *ignore) {
+  // push one byte to indicate register then read back content
+  i2c_write_blocking(I2C1_PORT, BME688_ADDR, &reg_addr, 1, true);
+  return i2c_read_blocking(I2C1_PORT, BME688_ADDR, reg_data, len, false);
+}
+
 int main() {
   stdio_init_all();
+
+  struct bme68x_dev bme688;
+  struct bme68x_data data;
+  int8_t result;
 
   // initialise LED
   gpio_init(LED);
@@ -42,24 +68,42 @@ int main() {
   gpio_pull_up(I2C1_SDA);
   gpio_pull_up(I2C1_SCL);
 
-  printf("Initialised i1c 1\n");
+  printf("Initialised i2c 1\n");
+
+  // initialise device -
+
+  // set up input structure
+  bme688.read = bme68x_i2c_read;
+  bme688.write = bme68x_i2c_write;
+  bme688.intf = BME68X_I2C_INTF;
+  bme688.intf_ptr = NULL;
+  bme688.amb_temp = 25;
+
+  // call init
+  result = bme68x_init(&bme688);
+  printf("init %d %d\n", result, BME68X_OK);
+
+  // TODO configure device: heater off; 1x filtering etc.
+
+  int j = 0;
 
   while (true) {
+
+    // read from device - does this need me to poke something into a register
+    // first?
+
+    printf("iter %d\n", j);
+    j++;
+    uint8_t ndata = 1;
+    result = bme68x_get_data(BME68X_FORCED_MODE, &data, &ndata, &bme688);
+    printf("read %d %d\n", result, BME68X_OK);
+    // print data
+
+    // blink LED
     gpio_put(LED, 0);
-    sleep_ms(100);
+    sleep_ms(1000);
     gpio_put(LED, 1);
-
-    int addr = 0x76;
-
-    int result;
-    uint8_t received;
-    result = i2c_read_blocking(I2C1_PORT, addr, &received, 1, false);
-    if (result < 0) {
-      printf("Not found\n");
-    } else {
-      printf("Found device at address %d\n", addr);
-    }
-    sleep_ms(100);
+    sleep_ms(1000);
   }
   return 0;
 }
