@@ -26,7 +26,7 @@
 const uint LED = 25;
 
 typedef struct i2c_config {
-  i2c_inst_t channel;
+  i2c_inst_t *channel;
   uint8_t addr;
 } i2c_config;
 
