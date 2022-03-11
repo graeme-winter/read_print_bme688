@@ -25,10 +25,17 @@
 
 const uint LED = 25;
 
+typedef struct i2c_config {
+  i2c_inst_t channel;
+  uint8_t addr;
+} i2c_config;
+
 // helper functions - map from bme68x API to pico SDK i2c
 
 BME68X_INTF_RET_TYPE bme68x_i2c_write(uint8_t reg_addr, const uint8_t *reg_data,
-                                      uint32_t len, void *ignore) {
+                                      uint32_t len, void *intf_addr) {
+  i2c_config *config = (i2c_config *)intf_addr;
+
   // copy message to prepend register - or could I just make
   // 2 calls to write with the first keeping the channel open?
   uint8_t buffer[len + 1];
@@ -37,14 +44,17 @@ BME68X_INTF_RET_TYPE bme68x_i2c_write(uint8_t reg_addr, const uint8_t *reg_data,
     buffer[j + 1] = reg_data[j];
   }
 
-  return i2c_write_blocking(I2C1_PORT, BME688_ADDR, buffer, len + 1, false);
+  return i2c_write_blocking(config->channel, config->addr, buffer, len + 1,
+                            false);
 }
 
 BME68X_INTF_RET_TYPE bme68x_i2c_read(uint8_t reg_addr, uint8_t *reg_data,
-                                     uint32_t len, void *ignore) {
+                                     uint32_t len, void *intf_addr) {
+  i2c_config *config = (i2c_config *)intf_addr;
+
   // push one byte to indicate register then read back content
-  i2c_write_blocking(I2C1_PORT, BME688_ADDR, &reg_addr, 1, true);
-  return i2c_read_blocking(I2C1_PORT, BME688_ADDR, reg_data, len, false);
+  i2c_write_blocking(config->channel, config->addr, &reg_addr, 1, true);
+  return i2c_read_blocking(config->channel, config->addr, reg_data, len, false);
 }
 
 int main() {
@@ -53,13 +63,14 @@ int main() {
   struct bme68x_dev bme688;
   struct bme68x_data data;
   int8_t result;
+  i2c_config config;
 
   // initialise LED
   gpio_init(LED);
   gpio_set_dir(LED, GPIO_OUT);
   gpio_put(LED, 1);
 
-  printf("Startup\n");
+  fprintf(stderr, "Startup\n");
 
   // I2C0 Initialisation. Using it at 400Khz.
   i2c_init(I2C1_PORT, 400 * 1000);
@@ -68,7 +79,10 @@ int main() {
   gpio_pull_up(I2C1_SDA);
   gpio_pull_up(I2C1_SCL);
 
-  printf("Initialised i2c 1\n");
+  config.channel = I2C1_PORT;
+  config.addr = BME688_ADDR;
+
+  fprintf(stderr, "Initialised i2c 1\n");
 
   // initialise device -
 
@@ -76,12 +90,12 @@ int main() {
   bme688.read = bme68x_i2c_read;
   bme688.write = bme68x_i2c_write;
   bme688.intf = BME68X_I2C_INTF;
-  bme688.intf_ptr = NULL;
-  bme688.amb_temp = 25;
+  bme688.intf_ptr = (void *)&config;
+  bme688.amb_temp = 21;
 
   // call init
   result = bme68x_init(&bme688);
-  printf("init %d %d\n", result, BME68X_OK);
+  fprintf(stderr, "init %d %d\n", result, BME68X_OK);
 
   // TODO configure device: heater off; 1x filtering etc.
 
@@ -90,13 +104,13 @@ int main() {
   while (true) {
 
     // read from device - does this need me to poke something into a register
-    // first?
+    // first? seems to be handled by get_data with forced mode
 
-    printf("iter %d\n", j);
+    fprintf(stderr, "iter %d\n", j);
     j++;
     uint8_t ndata = 1;
     result = bme68x_get_data(BME68X_FORCED_MODE, &data, &ndata, &bme688);
-    printf("read %d %d\n", result, BME68X_OK);
+    fprintf(stderr, "read %d %d\n", result, BME68X_OK);
     // print data
 
     // blink LED
