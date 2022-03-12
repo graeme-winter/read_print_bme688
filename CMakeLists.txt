@@ -15,7 +15,7 @@ pico_set_program_name(read_print_bme688 "read_print_bme688")
 pico_set_program_version(read_print_bme688 "0.1")
 
 pico_enable_stdio_uart(read_print_bme688 1)
-pico_enable_stdio_usb(read_print_bme688 1)
+pico_enable_stdio_usb(read_print_bme688 0)
 
 target_link_libraries(read_print_bme688 pico_stdlib hardware_i2c)
 

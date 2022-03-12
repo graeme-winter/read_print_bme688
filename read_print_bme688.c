@@ -57,6 +57,10 @@ BME68X_INTF_RET_TYPE bme68x_i2c_read(uint8_t reg_addr, uint8_t *reg_data,
   return i2c_read_blocking(config->channel, config->addr, reg_data, len, false);
 }
 
+void bme68x_delay_us(uint32_t period, void *intf_addr) {
+  sleep_us((uint64_t) period);
+}
+
 int main() {
   stdio_init_all();
 
@@ -70,7 +74,7 @@ int main() {
   gpio_set_dir(LED, GPIO_OUT);
   gpio_put(LED, 1);
 
-  fprintf(stderr, "Startup\n");
+  printf("Startup\n");
 
   // I2C0 Initialisation. Using it at 400Khz.
   i2c_init(I2C1_PORT, 400 * 1000);
@@ -82,20 +86,21 @@ int main() {
   config.channel = I2C1_PORT;
   config.addr = BME688_ADDR;
 
-  fprintf(stderr, "Initialised i2c 1\n");
+  printf("Initialised i2c 1\n");
 
   // initialise device -
 
   // set up input structure
   bme688.read = bme68x_i2c_read;
   bme688.write = bme68x_i2c_write;
+  bme688.delay_us = bme68x_delay_us;
   bme688.intf = BME68X_I2C_INTF;
   bme688.intf_ptr = (void *)&config;
   bme688.amb_temp = 21;
 
   // call init
   result = bme68x_init(&bme688);
-  fprintf(stderr, "init %d %d\n", result, BME68X_OK);
+  printf("init %d %d\n", result, BME68X_OK);
 
   // TODO configure device: heater off; 1x filtering etc.
 
@@ -106,18 +111,18 @@ int main() {
     // read from device - does this need me to poke something into a register
     // first? seems to be handled by get_data with forced mode
 
-    fprintf(stderr, "iter %d\n", j);
+    printf("iter %d\n", j);
     j++;
     uint8_t ndata = 1;
     result = bme68x_get_data(BME68X_FORCED_MODE, &data, &ndata, &bme688);
-    fprintf(stderr, "read %d %d\n", result, BME68X_OK);
+    printf("read %d %d\n", result, BME68X_OK);
     // print data
 
     // blink LED
     gpio_put(LED, 0);
-    sleep_ms(1000);
+    sleep_ms(100);
     gpio_put(LED, 1);
-    sleep_ms(1000);
+    sleep_ms(100);
   }
   return 0;
 }
