@@ -44,8 +44,9 @@ BME68X_INTF_RET_TYPE bme68x_i2c_write(uint8_t reg_addr, const uint8_t *reg_data,
     buffer[j + 1] = reg_data[j];
   }
 
-  return i2c_write_blocking(config->channel, config->addr, buffer, len + 1,
-                            false);
+  i2c_write_blocking(config->channel, config->addr, buffer, len + 1, false);
+  // FIXME some status check would be good
+  return 0;
 }
 
 BME68X_INTF_RET_TYPE bme68x_i2c_read(uint8_t reg_addr, uint8_t *reg_data,
@@ -54,7 +55,9 @@ BME68X_INTF_RET_TYPE bme68x_i2c_read(uint8_t reg_addr, uint8_t *reg_data,
 
   // push one byte to indicate register then read back content
   i2c_write_blocking(config->channel, config->addr, &reg_addr, 1, true);
-  return i2c_read_blocking(config->channel, config->addr, reg_data, len, false);
+  i2c_read_blocking(config->channel, config->addr, reg_data, len, false);
+  // FIXME some status check please
+  return 0;
 }
 
 void bme68x_delay_us(uint32_t period, void *intf_addr) {
