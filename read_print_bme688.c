@@ -133,15 +133,19 @@ int main() {
     printf("iter %d\n", j);
     j++;
     uint8_t ndata = 1;
+    result = bme68x_set_op_mode(BME68X_FORCED_MODE, &bme688);
+    printf("set op mode %d %d\n", result, BME68X_OK);
     result = bme68x_get_data(BME68X_FORCED_MODE, &data, &ndata, &bme688);
-    printf("read %d %d\n", result, BME68X_OK);
+    printf("get data %d %d\n", result, BME68X_OK);
     // print data
+
+    printf("%.1f %.1f %.1f\n", data.temperature, data.pressure, data.humidity);
 
     // blink LED
     gpio_put(LED, 0);
-    sleep_ms(100);
+    sleep_ms(1000);
     gpio_put(LED, 1);
-    sleep_ms(100);
+    sleep_ms(1000);
   }
   return 0;
 }
