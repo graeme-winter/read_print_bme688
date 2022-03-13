@@ -61,7 +61,7 @@ BME68X_INTF_RET_TYPE bme68x_i2c_read(uint8_t reg_addr, uint8_t *reg_data,
 }
 
 void bme68x_delay_us(uint32_t period, void *intf_addr) {
-  sleep_us((uint64_t) period);
+  sleep_us((uint64_t)period);
 }
 
 int main() {
@@ -69,6 +69,8 @@ int main() {
 
   struct bme68x_dev bme688;
   struct bme68x_data data;
+  struct bme68x_conf dev_config;
+  struct bme68x_heatr_conf heater_config;
   int8_t result;
   i2c_config config;
 
@@ -106,6 +108,20 @@ int main() {
   printf("init %d %d\n", result, BME68X_OK);
 
   // TODO configure device: heater off; 1x filtering etc.
+  dev_config.filter = BME68X_FILTER_OFF;
+  dev_config.odr = BME68X_ODR_NONE;
+  dev_config.os_hum = BME68X_OS_16X;
+  dev_config.os_pres = BME68X_OS_1X;
+  dev_config.os_temp = BME68X_OS_2X;
+  result = bme68x_set_conf(&dev_config, &bme688);
+  printf("device init %d %d\n", result, BME68X_OK);
+
+  // disable heater
+  heater_config.enable = BME68X_DISABLE;
+  heater_config.heatr_temp = 0;
+  heater_config.heatr_dur = 0;
+  result = bme68x_set_heatr_conf(BME68X_FORCED_MODE, &heater_config, &bme688);
+  printf("heater init %d %d\n", result, BME68X_OK);
 
   int j = 0;
 
