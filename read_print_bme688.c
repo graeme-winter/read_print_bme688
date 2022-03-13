@@ -1,14 +1,8 @@
 /*
  * read_print_bme688
  *
- * very much work in progress... currently ->
- *
- * scan pico i2c busses for devices - checks devices connected to GPIO0/2 and
- * 2/3 (i.e. i2c 0 and 1)
- *
- * will assume that the bme68x is connected to i2c 1 on GPIO 2, 3 (i.e.
- * physical pins 4, 5 counting in people numbers) at address 0x76.
- *
+ * Simple code to read data from a bme688 over i2c (bus etc. defined below)
+ * and print to the stdout over UART.
  */
 
 #include "api/bme68x.h"
@@ -25,12 +19,14 @@
 
 const uint LED = 25;
 
+// struct to pass around the i2c channel information (over void *)
+
 typedef struct i2c_config {
   i2c_inst_t *channel;
   uint8_t addr;
 } i2c_config;
 
-// helper functions - map from bme68x API to pico SDK i2c
+// helper functions - write to i2c, read from i2c, sleep in µs
 
 BME68X_INTF_RET_TYPE bme68x_i2c_write(uint8_t reg_addr, const uint8_t *reg_data,
                                       uint32_t len, void *intf_addr) {
@@ -44,20 +40,37 @@ BME68X_INTF_RET_TYPE bme68x_i2c_write(uint8_t reg_addr, const uint8_t *reg_data,
     buffer[j + 1] = reg_data[j];
   }
 
-  i2c_write_blocking(config->channel, config->addr, buffer, len + 1, false);
-  // FIXME some status check would be good
-  return 0;
+  int result =
+      i2c_write_blocking(config->channel, config->addr, buffer, len + 1, false);
+
+  if (result == (len + 1)) {
+    return BME68X_INTF_RET_SUCCESS;
+  } else {
+    return result;
+  }
 }
 
 BME68X_INTF_RET_TYPE bme68x_i2c_read(uint8_t reg_addr, uint8_t *reg_data,
                                      uint32_t len, void *intf_addr) {
   i2c_config *config = (i2c_config *)intf_addr;
+  int result;
 
   // push one byte to indicate register then read back content
-  i2c_write_blocking(config->channel, config->addr, &reg_addr, 1, true);
-  i2c_read_blocking(config->channel, config->addr, reg_data, len, false);
-  // FIXME some status check please
-  return 0;
+  result =
+      i2c_write_blocking(config->channel, config->addr, &reg_addr, 1, true);
+
+  if (result != 1) {
+    return result;
+  }
+
+  result =
+      i2c_read_blocking(config->channel, config->addr, reg_data, len, false);
+
+  if (result == len) {
+    return BME68X_INTF_RET_SUCCESS;
+  } else {
+    return result;
+  }
 }
 
 void bme68x_delay_us(uint32_t period, void *intf_addr) {
@@ -79,8 +92,6 @@ int main() {
   gpio_set_dir(LED, GPIO_OUT);
   gpio_put(LED, 1);
 
-  printf("Startup\n");
-
   // I2C0 Initialisation. Using it at 400Khz.
   i2c_init(I2C1_PORT, 400 * 1000);
   gpio_set_function(I2C1_SDA, GPIO_FUNC_I2C);
@@ -91,11 +102,7 @@ int main() {
   config.channel = I2C1_PORT;
   config.addr = BME688_ADDR;
 
-  printf("Initialised i2c 1\n");
-
-  // initialise device -
-
-  // set up input structure
+  // initialise - set up input structure
   bme688.read = bme68x_i2c_read;
   bme688.write = bme68x_i2c_write;
   bme688.delay_us = bme68x_delay_us;
@@ -103,49 +110,38 @@ int main() {
   bme688.intf_ptr = (void *)&config;
   bme688.amb_temp = 21;
 
-  // call init
   result = bme68x_init(&bme688);
-  printf("init %d %d\n", result, BME68X_OK);
 
-  // TODO configure device: heater off; 1x filtering etc.
   dev_config.filter = BME68X_FILTER_OFF;
   dev_config.odr = BME68X_ODR_NONE;
-  dev_config.os_hum = BME68X_OS_16X;
-  dev_config.os_pres = BME68X_OS_1X;
-  dev_config.os_temp = BME68X_OS_2X;
+  dev_config.os_hum = BME68X_OS_4X;
+  dev_config.os_pres = BME68X_OS_4X;
+  dev_config.os_temp = BME68X_OS_4X;
+
   result = bme68x_set_conf(&dev_config, &bme688);
-  printf("device init %d %d\n", result, BME68X_OK);
 
   // disable heater
   heater_config.enable = BME68X_DISABLE;
   heater_config.heatr_temp = 0;
   heater_config.heatr_dur = 0;
-  result = bme68x_set_heatr_conf(BME68X_FORCED_MODE, &heater_config, &bme688);
-  printf("heater init %d %d\n", result, BME68X_OK);
 
-  int j = 0;
+  result = bme68x_set_heatr_conf(BME68X_FORCED_MODE, &heater_config, &bme688);
 
   while (true) {
 
-    // read from device - does this need me to poke something into a register
-    // first? seems to be handled by get_data with forced mode
-
-    printf("iter %d\n", j);
-    j++;
     uint8_t ndata = 1;
     result = bme68x_set_op_mode(BME68X_FORCED_MODE, &bme688);
-    printf("set op mode %d %d\n", result, BME68X_OK);
     result = bme68x_get_data(BME68X_FORCED_MODE, &data, &ndata, &bme688);
-    printf("get data %d %d\n", result, BME68X_OK);
-    // print data
-
     printf("%.1f %.1f %.1f\n", data.temperature, data.pressure, data.humidity);
 
     // blink LED
-    gpio_put(LED, 0);
-    sleep_ms(1000);
     gpio_put(LED, 1);
-    sleep_ms(1000);
+    sleep_ms(100);
+    gpio_put(LED, 0);
+
+    // wait for a spell
+    sleep_ms(9900);
   }
+
   return 0;
 }
